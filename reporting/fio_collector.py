@@ -68,7 +68,7 @@ def main(options):
     chart = FIOPlot(data=fmtd_data,
                     title=options.title,
                     xlabel='Concurrent jobs',
-                    ylabel='Response Time (usec)')
+                    ylabel='Response Time (ms)')
     chart.generate_plot(options.output_file)
 
     print fmtd_data
