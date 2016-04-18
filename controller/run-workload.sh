@@ -147,7 +147,7 @@ function main {
   
   if ! fio_OK ; then 
     echo -e "Run aborted, unable to continue.\n"
-    #exit 16
+    exit 16
   fi
 
   echo -e "\nSettings for this run;"
