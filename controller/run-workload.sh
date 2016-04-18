@@ -44,7 +44,7 @@ function fio_OK {
   # Process the client list, and check FIO_PORT is open on each one
   for client in "${CLIENT[@]}"; do
     port_open=$(nc $client $FIO_PORT < /dev/null &> /dev/null; echo $?)
-    if [ $port_open > 0 ]; then 
+    if [ $port_open -gt 0 ]; then 
       echo "-> Error, fio daemon on '${client}' is not accessible"
       rc=1
     fi
