@@ -56,7 +56,7 @@ function fio_OK {
 function drop_cache {
   :
   local delay_secs=10
-  echo "- dropping cache across each hypervisor"
+  echo "- flushing page cache across each hypervisor"
   $CMD_PFX ssh -n gprfc085 'echo 3 > /proc/sys/vm/drop_caches && sync'
   $CMD_PFX ssh -n gprfc086 'echo 3 > /proc/sys/vm/drop_caches && sync'
   $CMD_PFX ssh -n gprfc087 'echo 3 > /proc/sys/vm/drop_caches && sync'
@@ -67,7 +67,7 @@ function drop_cache {
 function get_vol_profile {
   local profile_output=vol_profile_${TARGET}_${2}
   echo "- writing volume profile data to $profile_output"
-  $CMD_PFX ssh -n gprfc085 "gluster vol profile $target_volume info " > $profile_output
+  $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET info " > $profile_output
 }
 
 
@@ -83,7 +83,7 @@ function run_fio {
   done
  
   echo "- running fio stream for ${num_vms} concurrent vm's"
-  $CMD_PFX fio ${client_string} --output=${output_file} --output-format=json $jobname
+  $CMD_PFX fio ${client_string} --output=${output_file} --output-format=json $JOBNAME
   echo "- output written to ${output_file}"
   
   if [ "$GETSTATS" ]; then
