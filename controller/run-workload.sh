@@ -65,7 +65,7 @@ function drop_cache {
 }
 
 function get_vol_profile {
-  local profile_output=vol_profile_${TARGET}_${2}
+  local profile_output=vol_profile_${TARGET}_${1}_${2}
   echo "- writing volume profile data to $profile_output"
   $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET info " > $profile_output
 }
@@ -98,6 +98,7 @@ function vol_profile {
     on)
        echo "  - gluster profile stats enabled for '${TARGET}'"
        $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET start"
+       $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET info clear"
        ;;
     off)
        echo "  - gluster profile stats disabled for '${TARGET}'"
