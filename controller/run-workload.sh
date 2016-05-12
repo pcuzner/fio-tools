@@ -82,13 +82,14 @@ function run_fio {
     client_string="$client_string --client=${vm}"
   done
  
-  echo "- running fio stream for ${num_vms} concurrent vm's"
+  echo "- running fio stream for ${num_vms} concurrent clients"
   $CMD_PFX fio ${client_string} --output=${output_file} --output-format=json $JOBNAME
   echo "- output written to ${output_file}"
   
   if [ "$GETSTATS" ]; then
     :
     get_vol_profile $num_vms_fmtd $JOBNAME
+    vol_profile clear
   fi
 }
 
@@ -102,7 +103,11 @@ function vol_profile {
        ;;
     off)
        echo "  - gluster profile stats disabled for '${TARGET}'"
-       $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET stop clear"
+       $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET stop"
+       ;;
+    clear)
+       echo "  - gluster profile stats cleared for '${TARGET}'"
+       $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET info clear"
        ;;
   esac
 }
@@ -155,7 +160,7 @@ function main {
   echo "  - file containing the fio client list is '${FILENAME}'"
   echo "  - ${#CLIENT[@]} client(s) listed"
   echo "  - fio jobfile called ${JOBNAME}"
-  echo "  - vm's are on gluster volume '${TARGET}'"
+  echo "  - gluster volume '${TARGET}'"
   echo "  - run mode is '${FIO_CLIENT_MODE}'"
 
   if [ "$GETSTATS" ]; then 
