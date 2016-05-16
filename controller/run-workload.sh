@@ -4,12 +4,14 @@
 # on each vm
 # all vm's are started
 
-# default filename containing the clients for the fio run
+# default filenames used by the script
 FILENAME="job_sequence"
+GLFS_NODES="glfs_nodes"
 FIO_TEMPFILE=$(mktemp)
 
 FIO_PORT=8765
 declare -a CLIENT
+declare -a HOST
 
 # run modes 
 MODES[0]="stepped"
@@ -25,6 +27,7 @@ function usage {
   echo -e "\t-j .... filename which contains the fio job parameters (REQUIRED)"
   echo -e "\t-t .... target volume name (REQUIRED)"
   echo -e "\t-f .... filename which contains a row for each fio client"
+  echo -e "\t-g .... filename which contains a row for gluster node"
   echo -e "\t        (default = job_sequence)"
   echo -e "\t-m .... mode to run, 'stepped' (default) or immediate. "
   echo -e "\t        - stepped ramps up the workload one client at a time"
@@ -60,9 +63,10 @@ function drop_cache {
   :
   local delay_secs=10
   echo "- flushing page cache across each hypervisor"
-  $CMD_PFX ssh -n gprfc085 'echo 3 > /proc/sys/vm/drop_caches && sync'
-  $CMD_PFX ssh -n gprfc086 'echo 3 > /proc/sys/vm/drop_caches && sync'
-  $CMD_PFX ssh -n gprfc087 'echo 3 > /proc/sys/vm/drop_caches && sync'
+  for host in "${HOST[@]}"; do 
+    $CMD_PFX ssh -n $host 'echo 3 > /proc/sys/vm/drop_caches && sync'
+  done
+
   echo "- waiting ${delay_secs} secs"
   $CMD_PFX sleep ${delay_secs}
 }
@@ -70,7 +74,7 @@ function drop_cache {
 function get_vol_profile {
   local profile_output=vol_profile_${TARGET}_${1}_${2}
   echo "- writing volume profile data to $profile_output"
-  $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET info " > $profile_output
+  $CMD_PFX ssh -n ${HOST[0]} "gluster vol profile $TARGET info " > $profile_output
 }
 
 
@@ -101,16 +105,16 @@ function vol_profile {
   case $desired_state in
     on)
        echo "  - gluster profile stats enabled for '${TARGET}'"
-       $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET start"
-       $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET info clear"
+       $CMD_PFX ssh -n ${HOST[0]} "gluster vol profile $TARGET start"
+       $CMD_PFX ssh -n ${HOST[0]} "gluster vol profile $TARGET info clear"
        ;;
     off)
        echo "  - gluster profile stats disabled for '${TARGET}'"
-       $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET stop"
+       $CMD_PFX ssh -n ${HOST[0]} "gluster vol profile $TARGET stop"
        ;;
     clear)
        echo "  - gluster profile stats cleared for '${TARGET}'"
-       $CMD_PFX ssh -n gprfc085 "gluster vol profile $TARGET info clear"
+       $CMD_PFX ssh -n ${HOST[0]} "gluster vol profile $TARGET info clear"
        ;;
   esac
 }
@@ -147,6 +151,15 @@ function build_clients {
   done < ${FILENAME}
 }
 
+function build_hosts {
+  while read -r glfs_node; do 
+    if [[ ! $glfs_node =~ ^# ]]; then 
+      HOST+=($glfs_node)
+    fi
+  done < ${GLFS_NODES}
+}
+
+
 function update_fio_job {
 # passed variable to update, and the value
 
@@ -154,11 +167,13 @@ case "$1" in
   iodepth)
           if grep -q iodepth "$FIO_TEMPFILE" ; then
             sed -i "s/iodepth=.*/iodepth=${2}/" $FIO_TEMPFILE
+            echo "  - iodepth override applied (changed to ${2})"
           fi
           ;;
   numjobs)
           if grep -q numjobs "$FIO_TEMPFILE" ; then
             sed -i "s/numjobs=.*/numjobs=${2}/" $FIO_TEMPFILE
+            echo "  - numjobs override applied (changed to ${2})"
           fi
           ;;
 esac
@@ -169,6 +184,8 @@ esac
 
 function main {
   :
+  # build list of the hosts in the cluster from control file
+  build_hosts
 
   # populate the CLIENTS array from the 'job_sequence' file
   build_clients 
@@ -183,14 +200,16 @@ function main {
   echo -e "\nSettings for this run;"
   echo "  - file containing the fio client list is '${FILENAME}'"
   echo "  - ${#CLIENT[@]} client(s) listed"
+  echo "  - ${#HOST[@]} host(s) listed in '${GLFS_NODES}'"
+  echo "  - gluster commands routed through ${HOST[0]}"
   echo "  - fio jobfile called ${JOBNAME}"
   echo "  - gluster volume '${TARGET}'"
   echo "  - run mode is '${FIO_CLIENT_MODE}'"
 
-  if [ "${QDEPTH}" ] ; then 
+  if [ "${QDEPTH}" ]; then 
     update_fio_job 'iodepth' ${QDEPTH}
   fi
-  if [ "${NUMJOBS}" ] ; then 
+  if [ "${NUMJOBS}" ]; then 
     update_fio_job 'numjobs' ${NUMJOBS}
   fi
 
@@ -216,13 +235,16 @@ function main {
 
 
 
-while getopts ":j:dst:m:f:q:n:h" opt; do 
+while getopts ":j:dst:m:f:q:n:g:h" opt; do 
   case $opt in 
     j)
        JOBNAME=$OPTARG
        ;;
     s)
        GETSTATS=true
+       ;;
+    g) 
+       GLFS_HOSTS=$OPTARG
        ;;
     h) 
        usage
@@ -276,6 +298,16 @@ fi
 if [ -z "${FIO_CLIENT_MODE}" ]; then 
   FIO_CLIENT_MODE=${MODES[0]}
 fi
+
+if [ "${GLFS_HOSTS}" ]; then 
+  if [ ! -e "$GLFS_HOSTS" ]; then 
+    echo "gluster hostname file provided but can not be found"
+    exit 12
+  else 
+    GLFS_NODES=${GLFS_HOSTS}
+  fi
+fi
+
 
 
 if [ "$DEBUG" ]; then 
