@@ -6,6 +6,7 @@
 
 # default filename containing the clients for the fio run
 FILENAME="job_sequence"
+FIO_TEMPFILE=$(mktemp)
 
 FIO_PORT=8765
 declare -a CLIENT
@@ -30,6 +31,8 @@ function usage {
   echo -e "\t        - immediate starts the workload on all clients at once"
   echo -e "\t-s .... turn on gluster vol profile for the run (default is off)"
   echo -e "\t-d .... debug - do nothing except echo actions to the console"
+  echo -e "\t-q .... override the qdepth in the job file for this run"
+  echo -e "\t-n .... override the number of fio processes/client for this run"
   echo -e "\t-h .... display help and exit\n"     
   
 }
@@ -83,7 +86,7 @@ function run_fio {
   done
  
   echo "- running fio stream for ${num_vms} concurrent clients"
-  $CMD_PFX fio ${client_string} --output=${output_file} --output-format=json $JOBNAME
+  $CMD_PFX fio ${client_string} --output=${output_file} --output-format=json $FIO_TEMPFILE
   echo "- output written to ${output_file}"
   
   if [ "$GETSTATS" ]; then
@@ -144,6 +147,25 @@ function build_clients {
   done < ${FILENAME}
 }
 
+function update_fio_job {
+# passed variable to update, and the value
+
+case "$1" in 
+  iodepth)
+          if grep -q iodepth "$FIO_TEMPFILE" ; then
+            sed -i "s/iodepth=.*/iodepth=${2}/" $FIO_TEMPFILE
+          fi
+          ;;
+  numjobs)
+          if grep -q numjobs "$FIO_TEMPFILE" ; then
+            sed -i "s/numjobs=.*/numjobs=${2}/" $FIO_TEMPFILE
+          fi
+          ;;
+esac
+
+}
+
+
 
 function main {
   :
@@ -156,12 +178,23 @@ function main {
     exit 16
   fi
 
+  cp -f ${JOBNAME} ${FIO_TEMPFILE}
+
   echo -e "\nSettings for this run;"
   echo "  - file containing the fio client list is '${FILENAME}'"
   echo "  - ${#CLIENT[@]} client(s) listed"
   echo "  - fio jobfile called ${JOBNAME}"
   echo "  - gluster volume '${TARGET}'"
   echo "  - run mode is '${FIO_CLIENT_MODE}'"
+
+  if [ "${QDEPTH}" ] ; then 
+    update_fio_job 'iodepth' ${QDEPTH}
+  fi
+  if [ "${NUMJOBS}" ] ; then 
+    update_fio_job 'numjobs' ${NUMJOBS}
+  fi
+
+
 
   if [ "$GETSTATS" ]; then 
     vol_profile on
@@ -170,16 +203,20 @@ function main {
   fi  
   
   process_clients
+
+  echo -e "\nremoving temporary fio job file"
+  rm -f $FIO_TEMPFILE
   
-  echo -e "\nRun sequence complete"  
+  echo -e "Run sequence complete"  
   if [ "$GETSTATS" ]; then 
     vol_profile off
   fi
+
 }
 
 
 
-while getopts ":j:dst:m:f:h" opt; do 
+while getopts ":j:dst:m:f:q:n:h" opt; do 
   case $opt in 
     j)
        JOBNAME=$OPTARG
@@ -208,6 +245,12 @@ while getopts ":j:dst:m:f:h" opt; do
 	   ;;
     t)
        TARGET=$OPTARG
+       ;;
+    q)
+       QDEPTH=$OPTARG
+       ;;
+    n)
+       NUMJOBS=$OPTARG
        ;;
     d)
        DEBUG=true 
