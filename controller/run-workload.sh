@@ -1,12 +1,10 @@
 #!/usr/bin/bash
 
-# assume for now that the fio daemon processes are active
-# on each vm
-# all vm's are started
+# Assumptions for the run;
+# 1) all vm's are started
 
 # default filenames used by the script
-FILENAME="job_sequence"
-GLFS_NODES="glfs_nodes"
+CFG_FILE="run-workload.yaml"
 FIO_TEMPFILE=$(mktemp)
 
 FIO_PORT=8765
@@ -26,9 +24,7 @@ function usage {
   echo "Options"
   echo -e "\t-j .... filename which contains the fio job parameters (REQUIRED)"
   echo -e "\t-t .... target volume name (REQUIRED)"
-  echo -e "\t-f .... filename which contains a row for each fio client"
-  echo -e "\t-g .... filename which contains a row for gluster node"
-  echo -e "\t        (default = job_sequence)"
+  echo -e "\t-f .... configuration file name (default is '${CFG_FILE}')"
   echo -e "\t-m .... mode to run, 'stepped' (default) or immediate. "
   echo -e "\t        - stepped ramps up the workload one client at a time"
   echo -e "\t        - immediate starts the workload on all clients at once"
@@ -143,20 +139,12 @@ function process_clients {
 
 function build_clients {
   :	
-  while read -r vm_name; do
-
-    if [[ ! $vm_name =~ ^# ]]; then
-      CLIENT+=($vm_name)
-    fi
-  done < ${FILENAME}
+  read -a CLIENT <<< $(cat $CFG_FILE | python -c "import yaml,sys; cfg=yaml.load(sys.stdin); print ' '.join(cfg['clients'])")
 }
 
 function build_hosts {
-  while read -r glfs_node; do 
-    if [[ ! $glfs_node =~ ^# ]]; then 
-      HOST+=($glfs_node)
-    fi
-  done < ${GLFS_NODES}
+  :  
+  read -a HOST <<< $(cat $CFG_FILE | python -c "import yaml,sys; cfg=yaml.load(sys.stdin); print ' '.join(cfg['hosts'])")
 }
 
 
@@ -198,9 +186,9 @@ function main {
   cp -f ${JOBNAME} ${FIO_TEMPFILE}
 
   echo -e "\nSettings for this run;"
-  echo "  - file containing the fio client list is '${FILENAME}'"
+  echo "  - configuration file used is '${CFG_FILE}'"
   echo "  - ${#CLIENT[@]} client(s) listed"
-  echo "  - ${#HOST[@]} host(s) listed in '${GLFS_NODES}'"
+  echo "  - ${#HOST[@]} host(s) listed"
   echo "  - gluster commands routed through ${HOST[0]}"
   echo "  - fio jobfile called ${JOBNAME}"
   echo "  - gluster volume '${TARGET}'"
@@ -235,7 +223,7 @@ function main {
 
 
 
-while getopts ":j:dst:m:f:q:n:g:h" opt; do 
+while getopts ":j:dst:m:f:q:n:h" opt; do 
   case $opt in 
     j)
        JOBNAME=$OPTARG
@@ -243,19 +231,12 @@ while getopts ":j:dst:m:f:q:n:g:h" opt; do
     s)
        GETSTATS=true
        ;;
-    g) 
-       GLFS_HOSTS=$OPTARG
-       ;;
     h) 
        usage
        exit 0
        ;;
     f)
-       FILENAME=$OPTARG
-       if ! [ -e "$FILENAME" ]; then 
-         echo "-> Error, filename provided not found (specify full path?)"
-         exit 16
-       fi
+       CFG_FILE=$OPTARG
        ;;
     m)
        FIO_CLIENT_MODE=$OPTARG
@@ -285,6 +266,11 @@ while getopts ":j:dst:m:f:q:n:g:h" opt; do
 
 done
 
+if ! [ -e "$CFG_FILE" ]; then 
+  echo "-> Error, config filename provided not found (specify full path?)"
+  exit 16
+fi
+
 if [ -z "${JOBNAME}" ] || [ -z "${TARGET}" ]; then
   echo "job name and target volume must be supplied"
   exit 12
@@ -298,17 +284,6 @@ fi
 if [ -z "${FIO_CLIENT_MODE}" ]; then 
   FIO_CLIENT_MODE=${MODES[0]}
 fi
-
-if [ "${GLFS_HOSTS}" ]; then 
-  if [ ! -e "$GLFS_HOSTS" ]; then 
-    echo "gluster hostname file provided but can not be found"
-    exit 12
-  else 
-    GLFS_NODES=${GLFS_HOSTS}
-  fi
-fi
-
-
 
 if [ "$DEBUG" ]; then 
   CMD_PFX="echo DEBUG -->"

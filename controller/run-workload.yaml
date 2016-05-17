@@ -1,0 +1,24 @@
+# configuration file
+# Use a comment symbol to skip client(s) from the run
+#
+# TIP - remember to indent with spaces not tabs
+
+# Hosts running rhev + gluster
+hosts : 
+  - gprfc085
+  - gprfc086
+  - gprfc087
+
+# Clients that will be running fio
+# the order they appear in here is also the order of execution during the run
+clients : 
+  - fio-1
+#  - fio-2
+#  - fio-3
+#  - fio-4
+#  - fio-5
+#  - fio-6
+#  - fio-7
+#  - fio-8
+#  - fio-9
+#  - fio-10
