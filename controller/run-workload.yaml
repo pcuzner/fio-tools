@@ -4,6 +4,7 @@
 # TIP - remember to indent with spaces not tabs
 
 # Hosts running rhev + gluster
+# 1st one will be used for all gluster commands
 hosts : 
   - gprfc085
   - gprfc086
@@ -12,13 +13,36 @@ hosts :
 # Clients that will be running fio
 # the order they appear in here is also the order of execution during the run
 clients : 
+#  - gprfc085.sbu.lab.eng.bos.redhat.com
+#  - gprfc086.sbu.lab.eng.bos.redhat.com
+#  - gprfc087.sbu.lab.eng.bos.redhat.com
   - fio-1
-#  - fio-2
-#  - fio-3
-#  - fio-4
-#  - fio-5
-#  - fio-6
-#  - fio-7
-#  - fio-8
-#  - fio-9
-#  - fio-10
+  - fio-2
+  - fio-3
+  - fio-4
+  - fio-5
+  - fio-6
+  - fio-7
+  - fio-8
+  - fio-9
+  - fio-10
+  - fio-11
+  - fio-12
+  - fio-13
+  - fio-14
+  - fio-15
+  - fio-16
+  - fio-17
+  - fio-18
+  - fio-19
+  - fio-20
+  - fio-21
+  - fio-22
+  - fio-23
+  - fio-24
+  - fio-25
+  - fio-26
+  - fio-27
+  - fio-28
+  - fio-29
+  - fio-30
