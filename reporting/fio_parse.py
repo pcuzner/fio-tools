@@ -48,7 +48,7 @@ def extract_json_data(json_filename):
 
 
 def get_json_data(json_file, json_path):
-
+    print 'processing file %s' % json_file
     json_data = extract_json_data(json_file)
     status_msg = 'OK'
     response = {}

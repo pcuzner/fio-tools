@@ -46,38 +46,86 @@ def format_perf_data(perf_data):
 
     return perf_data
 
+def aggregate_data(data_in, aggr_type='iops'):
+    aggr_data = {}
+    summary_data = []
+    max_element = get_max_listsize(data_in)
+
+    for ptr in range(0,max_element):
+        data_points = []
+        divisor = 0
+        for key in data_in:
+            if data_in[key][ptr] is not None:
+                data_points.append(data_in[key][ptr])
+                divisor +=1 
+        if aggr_type == 'iops':
+            summary_data.append(sum(data_points))
+        elif aggr_type == 'latency':
+            print "%d " % (sum(data_points)/float(divisor))
+            summary_data.append(sum(data_points)/float(divisor))
+
+    aggr_data['Aggregated Data'] = summary_data
+    return aggr_data
 
 def main(options):
 
     perf_data = {}
 
+    chart_ceiling = None if options.ceiling == "none" else options.ceiling
+
     json_file_list = get_files(options.fio_file_path)
-    for f in json_file_list:
-        perf_sample = fio_parse.get_json_data(json_file=f, json_path=options.json_key)
-        if perf_sample['status'] == 'OK':
-            del perf_sample['status']
-            for key in perf_sample:
-                if key in perf_data:
-                    perf_data[key].append(perf_sample[key])
-                else:
-                    perf_data[key] = [perf_sample[key]]
 
-    # need to nromalise the data before we can use it
-    fmtd_data = format_perf_data(perf_data)
+    if json_file_list:
+        for f in json_file_list:
+            perf_sample = fio_parse.get_json_data(json_file=f, json_path=options.json_key)
+            if perf_sample['status'] == 'OK':
+                del perf_sample['status']
+                for key in perf_sample:
+                    if key in perf_data:
+                        perf_data[key].append(perf_sample[key])
+                    else:
+                        perf_data[key] = [perf_sample[key]]
 
-    chart = FIOPlot(data=fmtd_data,
-                    title=options.title,
-                    xlabel='Concurrent jobs',
-                    ylabel='Response Time (ms)')
-    chart.generate_plot(options.output_file)
+        # need to add padding to the data to make each entry have the same 
+        # number of observations
+        fmtd_data = format_perf_data(perf_data)
 
-    print fmtd_data
+        if options.data_aggregate:
+            fmtd_data = aggregate_data(fmtd_data, options.chart_type)
+
+        chart = FIOPlot(chart_type=options.chart_type,
+                        data=fmtd_data,
+                        title=options.title,
+                        ceiling=chart_ceiling,
+                        xlabel='Concurrent jobs',
+                        ylabel=options.ylabel)
+
+        chart.generate_plot(options.output_file)
+
+        print fmtd_data
+    else:
+        print "no files found matching the path provided %s" % options.fio_file_path
 
 
 if __name__ == "__main__":
-    usage_info = "usage: %prog [options]"
+    usage_info = "Usage: %prog [options]"
 
     parser = OptionParser(usage=usage_info, version="%prog 0.1")
+    parser.add_option("-y", "--yaxis-label", dest="ylabel", action="store",
+                      default="Response Time (ms)",
+                      help="Chart label for the yaxis")
+    parser.add_option("-T", "--chart-type", dest="chart_type", action="store",
+                      choices=['iops','latency'],default='latency',
+                      help="chart type - either iops or [latency]")
+    parser.add_option("-a", "--aggr", dest="data_aggregate", action="store_true",
+                      default=False,
+                      help="aggregate the iops or latency data, instead of per job data")
+    parser.add_option("-D", "--debug", dest="debug", action="store_true",
+                      default=False,
+                      help="turn on debug output")
+    parser.add_option("-c", "--ceiling", dest="ceiling", action="store",
+                      default=50000,
+                      help="(int) ceiling to show Max acceptable values, or none")
     parser.add_option("-p", "--pathname", dest="fio_file_path", action="store",
                       help="file name/path containing fio json output")
     parser.add_option("-k", "--keyname", dest="json_key", action="store",
@@ -88,6 +136,7 @@ if __name__ == "__main__":
                       help="output filename", default="myfile.png")
 
     (options, args) = parser.parse_args()
+
     if options.fio_file_path and options.json_key:
         main(options)
     else:
