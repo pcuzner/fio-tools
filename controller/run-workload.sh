@@ -31,10 +31,16 @@ function usage {
   echo -e "\t-s .... turn on gluster vol profile for the run (default is off)"
   echo -e "\t-d .... debug - do nothing except echo actions to the console"
   echo -e "\t-q .... override the qdepth in the job file for this run"
+  echo -e "\t-r .... override the runtime defined (secs)"
   echo -e "\t-n .... override the number of fio processes/client for this run"
   echo -e "\t-h .... display help and exit\n"     
   
 }
+
+function timestamp {
+  now=$(date +%H:%M:%S)
+  echo $now
+  }
 
 function fio_OK {
   # 0 .. OK
@@ -55,15 +61,15 @@ function fio_OK {
   return $rc
 }
 
-function drop_cache {
+function drop_page_cache {
   :
   local delay_secs=10
-  echo "- flushing page cache across each hypervisor"
+  echo "$(timestamp) flushing page cache across each hypervisor"
   for host in "${HOST[@]}"; do 
     $CMD_PFX ssh -n $host 'echo 3 > /proc/sys/vm/drop_caches && sync'
   done
 
-  echo "- waiting ${delay_secs} secs"
+  echo "$(timestamp) waiting ${delay_secs} secs"
   $CMD_PFX sleep ${delay_secs}
 }
 
@@ -85,9 +91,9 @@ function run_fio {
     client_string="$client_string --client=${vm}"
   done
  
-  echo "- running fio stream for ${num_vms} concurrent clients"
+  echo "$(timestamp) running fio stream for ${num_vms} concurrent clients"
   $CMD_PFX fio ${client_string} --output=${output_file} --output-format=json $FIO_TEMPFILE
-  echo "- output written to ${output_file}"
+  echo "$(timestamp) output written to ${output_file}"
   
   if [ "$GETSTATS" ]; then
     :
@@ -117,7 +123,7 @@ function vol_profile {
 
 function process_clients {
   
-  echo -e "\nExecution starting;"
+  echo -e "\n$(timestamp) Execution starting;"
   local client
   
   case $FIO_CLIENT_MODE in 
@@ -125,12 +131,12 @@ function process_clients {
        declare -a client_list
        for client in ${CLIENT[@]}; do 
          client_list+=($client)
-         drop_cache
+         drop_page_cache
          run_fio client_list[@] 
        done
        ;;
     immediate)
-       drop_cache
+       drop_page_cache
        run_fio CLIENT[@]
        ;;
   esac
@@ -152,18 +158,22 @@ function update_fio_job {
 # passed variable to update, and the value
 
 case "$1" in 
-  iodepth)
-          if grep -q iodepth "$FIO_TEMPFILE" ; then
-            sed -i "s/iodepth=.*/iodepth=${2}/" $FIO_TEMPFILE
-            echo "  - iodepth override applied (changed to ${2})"
+  iodepth|numjobs|runtime)
+          if grep -q ${1} "$FIO_TEMPFILE" ; then
+            sed -i "s/${1}=.*/${1}=${2}/" $FIO_TEMPFILE
+            echo "  - ${1} override applied (changed to ${2})"
           fi
           ;;
-  numjobs)
-          if grep -q numjobs "$FIO_TEMPFILE" ; then
-            sed -i "s/numjobs=.*/numjobs=${2}/" $FIO_TEMPFILE
-            echo "  - numjobs override applied (changed to ${2})"
-          fi
-          ;;
+  *)
+	  echo "Unknown update option for fio job file"
+	  exit 16
+	  ;;
+#  numjobs)
+#          if grep -q numjobs "$FIO_TEMPFILE" ; then
+#            sed -i "s/numjobs=.*/numjobs=${2}/" $FIO_TEMPFILE
+#            echo "  - numjobs override applied (changed to ${2})"
+#          fi
+#          ;;
 esac
 
 }
@@ -200,6 +210,9 @@ function main {
   if [ "${NUMJOBS}" ]; then 
     update_fio_job 'numjobs' ${NUMJOBS}
   fi
+  if [ "${RUNTIME}" ]; then 
+    update_fio_job 'runtime' ${RUNTIME}
+  fi
 
 
 
@@ -214,7 +227,7 @@ function main {
   echo -e "\nremoving temporary fio job file"
   rm -f $FIO_TEMPFILE
   
-  echo -e "Run sequence complete"  
+  echo "$(timestamp) Run sequence complete"  
   if [ "$GETSTATS" ]; then 
     vol_profile off
   fi
@@ -223,7 +236,7 @@ function main {
 
 
 
-while getopts ":j:dst:m:f:q:n:h" opt; do 
+while getopts ":j:dst:m:f:q:n:r:h" opt; do 
   case $opt in 
     j)
        JOBNAME=$OPTARG
@@ -251,6 +264,9 @@ while getopts ":j:dst:m:f:q:n:h" opt; do
        ;;
     q)
        QDEPTH=$OPTARG
+       ;;
+    r)
+       RUNTIME=$OPTARG
        ;;
     n)
        NUMJOBS=$OPTARG
