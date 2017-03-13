@@ -1,0 +1,12 @@
+[Unit]
+Description=FIO daemon
+After=network.online.target
+
+[Service]
+Type=forking
+User=root
+Group=root
+ExecStart=/usr/bin/fio --server --daemonize=/var/run/fio-svr.pid
+
+[Install]
+WantedBy=multi-user.target
