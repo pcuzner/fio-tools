@@ -32,17 +32,6 @@ def extract_json_data(json_filename):
                 start_ptr += 1
             start_ptr -= 2
             json_data = raw_lines[start_ptr:]
-        # with open(json_filename) as raw_json:
-        #     for json_in in raw_json:
-        #         # when in client server mode the data can have invalid json at the
-        #         # start, so we need to bypass invalid lines
-        #         if json_in.startswith('{') and last_record.startswith('Disk'):
-        #             data_ready = True
-        #         if data_ready and json_in[0] in ['{', ' ', '}']:
-        #             print json_in[0]
-        #             json_data.append(json_in)
-        #         else:
-        #             last_record = json_in
 
     return json_data
 
