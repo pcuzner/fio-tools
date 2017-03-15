@@ -36,30 +36,61 @@ def extract_json_data(json_filename):
     return json_data
 
 
+class JSONError(Exception):
+    pass
+
+
 def get_json_data(json_file, json_path):
+    """ return a dict containing the required values from the json file
+
+    :param json_file: (str) file name containing the fio output in JSON format
+    :param json_path: (str or list) to the relevant json element delimeted by
+                      '/'
+                      e.g. read/iops or ['read/iops','write/iops']
+    :return: dict containing one element per json key, with all values for
+             that key. A 'status' element is also added to denote the
+             success of the JSON extract ('OK' or Error bla bla)
+    """
+
     print 'processing file %s' % json_file
+
     json_data = extract_json_data(json_file)
-    status_msg = 'OK'
-    response = {}
+    json_key_list = []
+
+    if isinstance(json_path, list):
+        json_key_list = json_path
+    else:
+        json_key_list.append(json_path)
+
+    response = {_k: {} for _k in json_key_list}
+    response['status'] = 'OK'
 
     if json_data:
         try:
             fio_json = json.loads(''.join(json_data))
         except:
-            status_msg = "ERROR: invalid JSON in " % json_file
+            response['status'] = "ERROR: invalid JSON in {}".format(json_file)
         else:
-            for client_data in fio_json['client_stats']:
-                host_name = client_data['hostname']
-                element_data = get_element_value(client_data, json_path)
-                if str(element_data).startswith('ERROR'):
-                    status_msg = "ERROR: unable to find element in json file for path %s" % json_path
-                    break
-                else:
-                    response[host_name] = element_data
-    else:
-        status_msg = "File name is empty or not usable"
+            try:
+                for client_data in fio_json['client_stats']:
+                    host_name = client_data['hostname']
 
-    response['status'] = status_msg
+                    for json_key in json_key_list:
+                        element_data = get_element_value(client_data, json_key)
+
+                        if str(element_data).startswith('ERROR'):
+                            raise JSONError("ERROR: unable to find element in json file for path {}".format(json_key))
+
+                        kv = {host_name: element_data}
+                        response[json_key].update(kv)
+
+            except JSONError as err_text:
+                response['status'] = err_text
+
+    else:
+        response['status'] = "ERROR: File name is empty or not usable"
+
+
 
     if __name__ == "__main__":
         print response
