@@ -20,7 +20,7 @@ function usage {
   echo -e "\nrun-workload.sh"
   echo -e "---------------\n"
   echo -e "Script to run a given fio workload against a number of"\
-       "\nclients, typically fio daemons running in virtual machines\n"
+       "\nclients running fio daemons\n"
   echo "Options"
   echo -e "\t-j .... filename which contains the fio job parameters (REQUIRED)"
   echo -e "\t-t .... target volume name (REQUIRED)"
@@ -33,7 +33,8 @@ function usage {
   echo -e "\t-q .... override the qdepth in the job file for this run"
   echo -e "\t-r .... override the runtime defined (secs)"
   echo -e "\t-n .... override the number of fio processes/client for this run"
-  echo -e "\t-h .... display help and exit\n"     
+  echo -e "\t-h .... display help and exit"
+  echo -e "\t-o .... output directory for fio json files etc\n"
   
 }
 
@@ -48,14 +49,19 @@ function fio_OK {
   local rc=0
   local client
   local port_open=0
-  
+
+  echo -e "\n$(timestamp) Checking fio daemon is accessible on each client"
+
   # Process the client list, and check FIO_PORT is open on each one
   for client in "${CLIENT[@]}"; do
     port_open=$(nc $client $FIO_PORT < /dev/null &> /dev/null; echo $?)
     if [ $port_open -gt 0 ]; then 
-      echo "-> Error, fio daemon on '${client}' is not accessible"
+      echo "- fio daemon on '${client}' is not accessible"
       rc=1
+    else
+      echo "- fio daemon on '${client}' is OK"
     fi
+
   done
   
   return $rc
@@ -79,12 +85,17 @@ function get_vol_profile {
   $CMD_PFX ssh -n ${HOST[0]} "gluster vol profile $TARGET info " > $profile_output
 }
 
+function get_vol_info {
+  local vol_info_file=${OUTDIR}/vol-info-${TARGET}
+  echo "$(timestamp) getting vol info for ${TARGET}"
+  $CMD_PFX ssh -n ${HOST[0]} "gluster vol info $TARGET" > $vol_info_file
+}
 
 function run_fio {
   local -a vm_names=("${!1}")
   local num_vms=${#vm_names[@]}
   local num_vms_fmtd=$(printf "%03d" $num_vms)
-  local output_file=${JOBNAME}_${TARGET}_${num_vms_fmtd}_json.out
+  local output_file=${OUTDIR}/${JOBNAME}_${TARGET}_${num_vms_fmtd}_json.out
   local client_string=""
   
   for vm in "${vm_names[@]}"; do
@@ -155,26 +166,20 @@ function build_hosts {
 
 
 function update_fio_job {
-# passed variable to update, and the value
+  # passed variable to update, and the value
 
-case "$1" in 
-  iodepth|numjobs|runtime)
-          if grep -q ${1} "$FIO_TEMPFILE" ; then
-            sed -i "s/${1}=.*/${1}=${2}/" $FIO_TEMPFILE
-            echo "  - ${1} override applied (changed to ${2})"
-          fi
-          ;;
-  *)
-	  echo "Unknown update option for fio job file"
-	  exit 16
-	  ;;
-#  numjobs)
-#          if grep -q numjobs "$FIO_TEMPFILE" ; then
-#            sed -i "s/numjobs=.*/numjobs=${2}/" $FIO_TEMPFILE
-#            echo "  - numjobs override applied (changed to ${2})"
-#          fi
-#          ;;
-esac
+  case "$1" in
+    iodepth|numjobs|runtime)
+            if grep -q ${1} "$FIO_TEMPFILE" ; then
+              sed -i "s/${1}=.*/${1}=${2}/" $FIO_TEMPFILE
+              echo "  - ${1} override applied (changed to ${2})"
+            fi
+            ;;
+    *)
+        echo "Unknown update option for fio job file"
+        exit 16
+        ;;
+  esac
 
 }
 
@@ -187,13 +192,15 @@ function main {
 
   # populate the CLIENTS array from the 'job_sequence' file
   build_clients 
-  
+
+  # fio daemon on every client specified MUST be accessible - if not abort
   if ! fio_OK ; then 
     echo -e "Run aborted, unable to continue.\n"
     exit 16
   fi
 
   cp -f ${JOBNAME} ${FIO_TEMPFILE}
+
 
   echo -e "\nSettings for this run;"
   echo "  - configuration file used is '${CFG_FILE}'"
@@ -203,6 +210,7 @@ function main {
   echo "  - fio jobfile called ${JOBNAME}"
   echo "  - gluster volume '${TARGET}'"
   echo "  - run mode is '${FIO_CLIENT_MODE}'"
+  echo "  - output files will be written to '${OUTDIR}'"
 
   if [ "${QDEPTH}" ]; then 
     update_fio_job 'iodepth' ${QDEPTH}
@@ -214,14 +222,15 @@ function main {
     update_fio_job 'runtime' ${RUNTIME}
   fi
 
+  cp -f ${FIO_TEMPFILE} ${OUTDIR}/fio.job
 
-
-  if [ "$GETSTATS" ]; then 
+  if [ "$GETSTATS" ]; then
     vol_profile on
   else
     echo "  - gluster stats NOT being captured for this run"
-  fi  
-  
+  fi
+
+  get_vol_info
   process_clients
 
   echo -e "\nremoving temporary fio job file"
@@ -236,8 +245,9 @@ function main {
 
 
 
-while getopts ":j:dst:m:f:q:n:r:h" opt; do 
-  case $opt in 
+while getopts ":j:dst:m:f:q:n:r:o:h" opt; do
+
+  case $opt in
     j)
        JOBNAME=$OPTARG
        ;;
@@ -271,6 +281,9 @@ while getopts ":j:dst:m:f:q:n:r:h" opt; do
     n)
        NUMJOBS=$OPTARG
        ;;
+    o)
+       OUTDIR=$OPTARG
+       ;;
     d)
        DEBUG=true 
        ;;
@@ -285,6 +298,22 @@ done
 if ! [ -e "$CFG_FILE" ]; then 
   echo "-> Error, config filename provided not found (specify full path?)"
   exit 16
+fi
+
+if [ -z "${OUTDIR}" ]; then
+
+  OUTDIR=$(pwd)/output
+  echo "-> using default output directory of '${OUTDIR}'"
+
+  if ! [ -d "$OUTDIR" ]; then
+    echo "   - creating new dir '${OUTDIR}'"
+    mkdir ${OUTDIR}
+  fi
+else
+  if ! [ -d "$OUTDIR" ]; then
+    echo "-> Error, output directory must exist prior to the run"
+    exit 16
+  fi
 fi
 
 if [ -z "${JOBNAME}" ] || [ -z "${TARGET}" ]; then
