@@ -51,8 +51,8 @@ def plot_iops_vs_latency(perf_metrics):
 
     # Print the data used in the chart to stdout
     micro = u'\u03bc'
-    print("\ntitle: {}".format(options.title))
-    print("subtitle: {}".format(options.subtitle))
+    print("\ntitle, {}".format(options.title))
+    print("subtitle, {}".format(options.subtitle))
     print("xaxis labels,{}".format(','.join(xlabels)))
     print("read iops,{}".format(
         ','.join(map(str, perf_metrics.get("read_iops")))))
