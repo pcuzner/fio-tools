@@ -1,6 +1,6 @@
 [global]
 ioengine=libaio
-unified_rw_reporting=1
+#unified_rw_reporting=1
 randrepeat=1
 norandommap=1
 group_reporting
