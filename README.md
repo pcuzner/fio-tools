@@ -66,12 +66,13 @@ write latency (μs),15936,14208,15509,19392,19993,23424
 
 ```
 
-By default genchart will launch a window showing you the graph.
+By default 'genchart' will launch a window showing you the graph.  
+eg.
 
-
+![example output](images/example.png)
 
 ###Script Options
-The workflow revolves around two scripts; run-workload.sh and gencharts.py. This section documents the options that may be used with these scripts.
+The complete workflow revolves around just two scripts; `run-workload.sh` and `gencharts.py`. This section documents the options that may be used with these scripts.
 
 ```
 run-workload.sh
@@ -97,7 +98,7 @@ Options
  
 ```  
 
-The options available when generating the I/O summary charts are;
+The options available when generating the I/O summary chart are;
 ```markdown
 [paul@work reporting]$ ./genchart.py -h
 Usage: genchart.py [options]
