@@ -14,7 +14,8 @@ This project contains some tools to make measuring performance with fio a little
 + the output directory needs to exist on each client
 
 ### Tested Versions
-RHEL7 - fio 2.1.7 from Dag Wiers repo (http://rpm.pbone.net/index.php3/stat/4/idpl/26433361/dir/redhat_el_7/com/fio-2.1.7-1.el7.rf.x86_64.rpm.html)
+RHEL7 - fio 2.1.7 from Dag Wiers repo (http://rpm.pbone.net/index.php3/stat/4/idpl/26433361/dir/redhat_el_7/com/fio-2.1.7-1.el7.rf.x86_64.rpm.html)  
+If you're using a Fedora as the controller, you can find the 2.1.9 version in https://koji.fedoraproject.org
 
 NB. testing with fio versions 2.2.8-1 and 2.2.8-2 from EPEL are prone to intermittent crc issues. 
 
