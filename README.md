@@ -5,12 +5,18 @@ This project contains some tools to make measuring performance with fio a little
 ## Pre-Requisites  
 + Use a node to act as the test controller - this can be your desktop
 + clone this repo to your controller node
-+ your controller will need python2-matplotlib and python2-numpy python packages installed (for graph generation)
++ your controller will need python2-matplotlib,python2-numpy, nmap-ncat
 + have passwordless ssh setup between your controller and the test vm's  
 + have passwordless ssh setup between your controller and the gluster nodes
 + ensure fio is installed on your controller and each vm (*NB. use the same versions!*)
 + on each vm install, enable and start the fio-server.service (from this repo's systemd directory)  
 + ensure that port 8765 is open on each vm
++ the output directory needs to exist on each client
+
+### Tested Versions
+RHEL7 - fio 2.1.7 from Dag Wiers repo (http://rpm.pbone.net/index.php3/stat/4/idpl/26433361/dir/redhat_el_7/com/fio-2.1.7-1.el7.rf.x86_64.rpm.html)
+
+NB. testing with fio versions 2.2.8-1 and 2.2.8-2 from EPEL are prone to intermittent crc issues. 
 
 ## Workflow
 For best results, evenly distribute the vm's across the hypervisors  
