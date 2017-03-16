@@ -1,5 +1,8 @@
 #!/usr/bin/bash
 
+# Requires
+# nmap-ncat
+
 # Assumptions for the run;
 # 1) all vm's are started
 
@@ -70,7 +73,7 @@ function fio_OK {
 function drop_page_cache {
   :
   local delay_secs=10
-  echo "$(timestamp) flushing page cache across each hypervisor"
+  echo "$(timestamp) flushing page cache across each gluster node"
   for host in "${HOST[@]}"; do 
     $CMD_PFX ssh -n $host 'echo 3 > /proc/sys/vm/drop_caches && sync'
   done
@@ -80,7 +83,7 @@ function drop_page_cache {
 }
 
 function get_vol_profile {
-  local profile_output=vol_profile_${TARGET}_${1}_${2}
+  local profile_output=${OUTDIR}/vol_profile_${TARGET}_${1}_${2}
   echo "- writing volume profile data to $profile_output"
   $CMD_PFX ssh -n ${HOST[0]} "gluster vol profile $TARGET info " > $profile_output
 }
@@ -95,7 +98,7 @@ function run_fio {
   local -a vm_names=("${!1}")
   local num_vms=${#vm_names[@]}
   local num_vms_fmtd=$(printf "%03d" $num_vms)
-  local output_file=${OUTDIR}/${JOBNAME}_${TARGET}_${num_vms_fmtd}_json.out
+  local output_file=${JOBNAME}_${TARGET}_${num_vms_fmtd}_json.out
   local client_string=""
   
   for vm in "${vm_names[@]}"; do
@@ -233,9 +236,14 @@ function main {
   get_vol_info
   process_clients
 
+
+
   echo -e "\nremoving temporary fio job file"
   rm -f $FIO_TEMPFILE
-  
+
+  echo "moving output files to ${OUTDIR}"
+  mv ${JOBNAME}_${TARGET}_*_json.out ${OUTDIR}/.
+
   echo "$(timestamp) Run sequence complete"  
   if [ "$GETSTATS" ]; then 
     vol_profile off
