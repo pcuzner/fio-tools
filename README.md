@@ -2,7 +2,7 @@
 This project contains some tools to make measuring performance with fio a little easier when working with gluster and ovirt. The goal is to use fio to benchmark latencies within vm's and then use the fio results as input to matplotlib.pylot, to simplify the interpretation of the results.  
   
 
-##Pre-Requisites  
+## Pre-Requisites  
 + Use a node to act as the test controller - this can be your desktop
 + clone this repo to your controller node
 + your controller will need python2-matplotlib and python2-numpy python packages installed (for graph generation)
@@ -12,12 +12,12 @@ This project contains some tools to make measuring performance with fio a little
 + on each vm install, enable and start the fio-server.service (from this repo's systemd directory)  
 + ensure that port 8765 is open on each vm
 
-##Workflow
+## Workflow
 For best results, evenly distribute the vm's across the hypervisors  
   
 The repo is split into two main steps; run the workload -> summarise the workload, with a pretty chart :)
 
-###Running the workload
+### Running the workload
 From the root of the repository
 1. ```cd controller```
 2. update run-workload.yml, defining your gluster hosts and clients (vm's)
@@ -36,7 +36,7 @@ Output is generated to a default 'output' sub-directory, or you may specify the 
 + a copy of the volume configuration (vol info)
 + gluster vol profiles for each test cycle [optional if you use the -s parameter]
 
-###Interpreting the Output
+### Interpreting the Output
 Once the run is complete, you can use the json data to create a chart
 1. cd ```../reporting```
 2. run the gencharts.py program to create the chart from the json data (-p points to the path location of the fio json files - normally the same dir as the -o option used by run-workload.sh)
@@ -71,7 +71,7 @@ eg.
 
 ![example output](images/example.png)
 
-###Script Options
+### Script Options
 The complete workflow revolves around just two scripts; `run-workload.sh` and `gencharts.py`. This section documents the options that may be used with these scripts.
 
 ```
