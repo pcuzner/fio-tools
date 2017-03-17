@@ -11,13 +11,16 @@ This project contains some tools to make measuring performance with fio a little
 + ensure fio is installed on your controller and each vm (*NB. use the same versions!*)
 + on each vm install, enable and start the fio-server.service (from this repo's systemd directory)  
 + ensure that port 8765 is open on each vm
-+ the output directory needs to exist on each client
 
 ### Tested Versions
-RHEL7 - fio 2.1.7 from Dag Wiers repo (http://rpm.pbone.net/index.php3/stat/4/idpl/26433361/dir/redhat_el_7/com/fio-2.1.7-1.el7.rf.x86_64.rpm.html)  
-If you're using a Fedora as the controller, you can find the 2.1.9 version in https://koji.fedoraproject.org
+Hypervisors : RHEL 7.3, Glusterfs 3.8.4   
+VM's: RHEL 7, fio 2.1.7  
+Controller: F25, fio 2.1.7  
 
-NB. testing with fio versions 2.2.8-1 and 2.2.8-2 from EPEL are prone to intermittent crc issues. 
+fio version can be found at http://rpm.pbone.net/index.php3/stat/4/idpl/26433361/dir/redhat_el_7/com/fio-2.1.7-1.el7.rf.x86_64.rpm.html  
+If you're using a Fedora as the controller, installing the same rpm as RHEL is fine.
+
+NB. As of March 2017, the fio version in EPEL (2.2.8-1 and 2.2.8-2) seem prone to intermittent crc payload issues when running fio in client/server mode. 
 
 ## Workflow
 For best results, evenly distribute the vm's across the hypervisors  
@@ -125,5 +128,61 @@ Options:
 
 ```
 
+### Example output during run-workload.sh  
+```markdown
+[root@work controller]# ./run-workload.sh -j randrw7030_test.job -r 60 -t ssd_data -o ~/output
+
+20:39:41 Checking fio daemon is accessible on each client
+- fio daemon on 'r73_01' is OK
+- fio daemon on 'r73_02' is OK
+- fio daemon on 'r73_03' is OK
+- fio daemon on 'r73_04' is OK
+- fio daemon on 'r73_05' is OK
+- fio daemon on 'r73_06' is OK
+
+Settings for this run;
+  - configuration file used is 'run-workload.yaml'
+  - 6 client(s) listed
+  - 3 host(s) listed
+  - gluster commands routed through gprfs029
+  - fio jobfile called randrw7030_test.job
+  - gluster volume 'ssd_data'
+  - run mode is 'stepped'
+  - output files will be written to '/root/output'
+  - runtime override applied (changed to 60)
+  - gluster stats NOT being captured for this run
+20:39:48 getting vol info for ssd_data
+
+20:39:54 Execution starting;
+20:39:54 flushing page cache across each hypervisor
+20:40:15 waiting 10 secs
+20:40:25 running fio stream for 1 concurrent clients
+20:41:27 output written to randrw7030_test.job_ssd_data_001_json.out] [eta 00m:00s]
+20:41:27 flushing page cache across each hypervisor
+20:41:50 waiting 10 secs
+20:42:00 running fio stream for 2 concurrent clients
+20:43:03 output written to randrw7030_test.job_ssd_data_002_json.outps] [eta 00m:00s]
+20:43:03 flushing page cache across each hypervisor
+20:43:24 waiting 10 secs
+20:43:34 running fio stream for 3 concurrent clients
+20:44:37 output written to randrw7030_test.job_ssd_data_003_json.outops] [eta 00m:00s]
+20:44:37 flushing page cache across each hypervisor
+20:45:00 waiting 10 secs
+20:45:10 running fio stream for 4 concurrent clients
+20:46:14 output written to randrw7030_test.job_ssd_data_004_json.outps] [eta 00m:00s]
+20:46:14 flushing page cache across each hypervisor
+20:46:36 waiting 10 secs
+20:46:46 running fio stream for 5 concurrent clients
+20:47:50 output written to randrw7030_test.job_ssd_data_005_json.outops] [eta 00m:00s]
+20:47:50 flushing page cache across each hypervisor
+20:48:11 waiting 10 secs
+20:48:21 running fio stream for 6 concurrent clients
+20:49:27 output written to randrw7030_test.job_ssd_data_006_json.outps] [eta 00m:00s]
+
+removing temporary fio job file
+moving output files to /root/output
+20:49:27 Run sequence complete
+
+```
 
 Have fun testing!
