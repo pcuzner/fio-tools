@@ -37,8 +37,53 @@ def get_files(path_name):
     return sorted(file_list)
 
 
-def convert_2_ms(x, p):
-    return "%d" % (x/1000)
+def convert_2_ms(x, p=None):
+    return "{}".format(int(x)/1000)
+
+
+class ChartDataError(Exception):
+    pass
+
+
+def show_perf_summary(perf_metrics):
+    """
+    Use the last observation in the dict to provide a quick summary of the
+    test run
+    :param perf_metrics:(dict) containing the io metrics
+    :return:
+    """
+    read_iops = perf_metrics.get('last_read_iops', [0])
+    write_iops = perf_metrics.get('last_write_iops', [0])
+    num_reporters = len(perf_metrics.get('read_iops', []))
+    avg_read = np.mean(read_iops)
+    avg_write = np.mean(write_iops)
+
+    total_iops = (perf_metrics.get('read_iops')[-1] +
+                  perf_metrics.get('write_iops')[-1])
+
+    print("\nSummary Statistics")
+    print("\tNumber of Clients  : {}".format(num_reporters))
+    print("\tTotal IOPS         : {}".format(total_iops))
+    print("\tAVG reads/VM       : {} (std={:4.1f})".format(
+        np.mean(read_iops), np.std(perf_metrics['last_read_iops'])))
+    print("\tAVG writes/VM      : {} (std={:4.1f})".format(
+        np.mean(write_iops), np.std(perf_metrics['last_write_iops'])))
+
+    print("\tAVG. Read Latency  : {}ms".format(
+        convert_2_ms(np.mean(perf_metrics.get('last_read_us')))))
+    print("\tAVG. Write Latency : {}ms".format(
+        convert_2_ms(np.mean(perf_metrics.get('last_write_us')))))
+    print("\tAVG. Latency       : {}ms".format(
+        convert_2_ms(np.mean(perf_metrics.get('last_read_us') +
+                             perf_metrics.get('last_write_us')))))
+    # print("\tAVG. Latency       : {:3.1f}".format())
+
+    print("\nNB.")
+    print("- Summary statistics are calculated from the data points in the "
+          "final json file \n  (usually the run with the highest vm density)")
+    print("- high std dev values indicate inconsistent performance across "
+          "vm's\n")
+
 
 
 def plot_iops_vs_latency(perf_metrics):
@@ -96,6 +141,7 @@ def plot_iops_vs_latency(perf_metrics):
     ax2.spines['top'].set_visible(False)
     ax1.xaxis.set_ticks_position('bottom')  # turn off top tick marks
     ax1.tick_params(direction='out')        # tick marks on the outside
+    ax2.tick_params(direction='out')
 
     plt.suptitle(options.title, fontsize=14)
     if options.subtitle:
@@ -107,10 +153,16 @@ def plot_iops_vs_latency(perf_metrics):
 
 def main(options):
 
+    # declare a dict to hold summary data.
     perf_data = {'read_iops': [],
+                 'last_read_iops': [],
                  'write_iops': [],
+                 'last_write_iops': [],
                  'read_latency': [],
-                 'write_latency': []}
+                 'last_read_us': [],
+                 'write_latency': [],
+                 'last_write_us': []
+                 }
 
     json_file_list = get_files(options.fio_file_path)
 
@@ -118,6 +170,9 @@ def main(options):
     mpl.rcParams['savefig.facecolor'] = 'white'  # saved chart colour
 
     if json_file_list:
+
+        last_file = json_file_list[-1]
+
         for f in json_file_list:
 
             #
@@ -143,7 +198,35 @@ def main(options):
                     int(np.mean([all['write/clat/percentile/95.000000'].get(vm)
                         for vm in all['write/clat/percentile/95.000000']])))
 
-        plot_iops_vs_latency(perf_data)
+                if f == last_file:
+                    # we'll produce a final summary specifically from the last
+                    # json file's data (should be the json file from fio run
+                    # with the most reporters (vm's)
+                    perf_data['last_read_iops'] = [int(
+                        all['read/iops'].get(vm)) for vm in all['read/iops']]
+                    perf_data['last_write_iops'] = [int(
+                        all['write/iops'].get(vm)) for vm in all['write/iops']]
+                    perf_data['last_read_us'] = [int(
+                        all['read/clat/percentile/95.000000'].get(vm))
+                                                 for vm in all['read/clat/percentile/95.000000']]
+                    perf_data['last_write_us'] = [int(
+                        all['write/clat/percentile/95.000000'].get(vm))
+                                                 for vm in all['write/clat/percentile/95.000000']]
+                    pass
+
+            else:
+                # problem reading the data from the json file(s)
+                raise ChartDataError("Problem reading the json files. Did you "
+                                     "have unified_rw_reporting=1 set in your"
+                                     " fio jobfile?")
+        if len(json_file_list) > 1:
+            # Producing a chart only really makes sense when there are multiple
+            # json files providing multiple data points
+            plot_iops_vs_latency(perf_data)
+
+        # Summarise the data provided by the last json file in the archive
+        show_perf_summary(perf_data)
+
 
     else:
         print("no files found matching the path"
