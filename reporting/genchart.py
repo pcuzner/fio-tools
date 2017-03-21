@@ -38,7 +38,7 @@ def get_files(path_name):
 
 
 def convert_2_ms(x, p=None):
-    return "{}".format(int(x)/1000)
+    return "{:3.1f}".format(x/1000)
 
 
 class ChartDataError(Exception):
@@ -55,8 +55,12 @@ def show_perf_summary(perf_metrics):
     read_iops = perf_metrics.get('last_read_iops', [0])
     write_iops = perf_metrics.get('last_write_iops', [0])
     num_reporters = len(perf_metrics.get('read_iops', []))
-    avg_read = np.mean(read_iops)
-    avg_write = np.mean(write_iops)
+
+    all_latency = []
+    if sum(perf_metrics.get('last_read_us')) > 0:
+        all_latency += perf_metrics.get('last_read_us')
+    if sum(perf_metrics.get('last_write_us')) > 0:
+        all_latency += perf_metrics.get('last_write_us')
 
     total_iops = (perf_metrics.get('read_iops')[-1] +
                   perf_metrics.get('write_iops')[-1])
@@ -64,9 +68,9 @@ def show_perf_summary(perf_metrics):
     print("\nSummary Statistics")
     print("\tNumber of Clients  : {}".format(num_reporters))
     print("\tTotal IOPS         : {}".format(total_iops))
-    print("\tAVG reads/VM       : {} (std={:4.1f})".format(
+    print("\tAVG reads/VM       : {} (std={:3.1f})".format(
         np.mean(read_iops), np.std(perf_metrics['last_read_iops'])))
-    print("\tAVG writes/VM      : {} (std={:4.1f})".format(
+    print("\tAVG writes/VM      : {} (std={:3.1f})".format(
         np.mean(write_iops), np.std(perf_metrics['last_write_iops'])))
 
     print("\tAVG. Read Latency  : {}ms".format(
@@ -74,9 +78,7 @@ def show_perf_summary(perf_metrics):
     print("\tAVG. Write Latency : {}ms".format(
         convert_2_ms(np.mean(perf_metrics.get('last_write_us')))))
     print("\tAVG. Latency       : {}ms".format(
-        convert_2_ms(np.mean(perf_metrics.get('last_read_us') +
-                             perf_metrics.get('last_write_us')))))
-    # print("\tAVG. Latency       : {:3.1f}".format())
+        convert_2_ms(np.mean(all_latency))))
 
     print("\nNB.")
     print("- Summary statistics are calculated from the data points in the "
@@ -108,6 +110,7 @@ def plot_iops_vs_latency(perf_metrics):
     print(u"write latency ({}s),{}\n".format(micro,
           ','.join(map(str, perf_metrics.get("write_latency")))))
 
+    # bar width
     width = 0.4
 
     fig, ax1 = plt.subplots()
