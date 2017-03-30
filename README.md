@@ -58,21 +58,46 @@ Once the run is complete, you can use the json data to create a chart
 
 eg.
 ```markdown
-[paul@work reporting]$ ./genchart.py -p ~/Downloads/7030_4 -t "NVME - Random R/W 70:30 4k I/O" -s "qdepth=8, 16GB data/vm" -o output/myfile.png
-processing file /home/paul/Downloads/7030_4/randrw7030.job_ssd_data_001_json.out
-processing file /home/paul/Downloads/7030_4/randrw7030.job_ssd_data_002_json.out
-processing file /home/paul/Downloads/7030_4/randrw7030.job_ssd_data_003_json.out
-processing file /home/paul/Downloads/7030_4/randrw7030.job_ssd_data_004_json.out
-processing file /home/paul/Downloads/7030_4/randrw7030.job_ssd_data_005_json.out
-processing file /home/paul/Downloads/7030_4/randrw7030.job_ssd_data_006_json.out
+[paul@work reporting]$ ./genchart.py -p ../controller/7030_6/ -t 'NVMe Bricks - FIO Random R/W 4K 70:30 Workload' -s '(qdepth=8, 16GB testdata per vm)'
+processing file ../controller/7030_6/randrw7030.job_ssd_data_001_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_002_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_003_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_004_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_005_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_006_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_007_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_008_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_009_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_010_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_011_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_012_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_013_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_014_json.out
+processing file ../controller/7030_6/randrw7030.job_ssd_data_015_json.out
 
-title, NVME - Random R/W 70:30 4k I/O
-subtitle, qdepth=8, 16GB data/vm
-xaxis labels,1 VM,2 VM's,3 VM's,4 VM's,5 VM's,6 VM's
-read iops,1091,2524,3818,4176,4646,4806
-write iops,468,1081,1635,1791,1995,2067
-read latency (μs),2024,2112,2480,3056,3260,3861
-write latency (μs),15936,14208,15509,19392,19993,23424
+title, NVMe Bricks - FIO Random R/W 4K 70:30 Workload
+subtitle, (qdepth=8, 16GB testdata per vm)
+xaxis labels,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+read iops,3223,6492,11292,12436,13244,13937,13951,13943,14063,14022,14049,13889,13740,13701,13655
+write iops,1380,2780,4836,5327,5674,5970,5978,5976,6025,6009,6015,5944,5887,5869,5848
+read latency (μs),1192,1232,1293,1556,1736,1864,2137,2372,2501,2787,2962,3186,3452,3725,3909
+write latency (μs),5216,5088,4021,5408,6403,7008,8685,10000,10844,12377,13701,14826,16443,17801,18969
+
+
+Summary Statistics
+	Number of job files: 15
+	Number of Clients  : 15
+	Total IOPS         : 19503
+	AVG reads/VM       : 910.333333333 (std=16.4)
+	AVG writes/VM      : 389.866666667 (std=7.0)
+	AVG. Read Latency  : 3.9ms
+	AVG. Write Latency : 19.0ms
+	AVG. Latency       : 11.4ms
+
+NB.
+- Summary statistics are calculated from the data points in the final json file 
+  (usually the run with the highest vm density)
+- high std dev values indicate inconsistent performance across vm's
 
 ```
 
