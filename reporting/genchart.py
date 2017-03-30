@@ -45,16 +45,18 @@ class ChartDataError(Exception):
     pass
 
 
-def show_perf_summary(perf_metrics):
+def show_perf_summary(perf_metrics, num_files):
     """
     Use the last observation in the dict to provide a quick summary of the
     test run
     :param perf_metrics:(dict) containing the io metrics
+    :param num_files:(int) count of the number of json files processed
     :return:
     """
+
     read_iops = perf_metrics.get('last_read_iops', [0])
     write_iops = perf_metrics.get('last_write_iops', [0])
-    num_reporters = len(perf_metrics.get('read_iops', []))
+    num_reporters = len(read_iops)
 
     all_latency = []
     if sum(perf_metrics.get('last_read_us')) > 0:
@@ -66,6 +68,7 @@ def show_perf_summary(perf_metrics):
                   perf_metrics.get('write_iops')[-1])
 
     print("\nSummary Statistics")
+    print("\tNumber of job files: {}".format(num_files))
     print("\tNumber of Clients  : {}".format(num_reporters))
     print("\tTotal IOPS         : {}".format(total_iops))
     print("\tAVG reads/VM       : {} (std={:3.1f})".format(
@@ -227,8 +230,8 @@ def main(options):
             # json files providing multiple data points
             plot_iops_vs_latency(perf_data)
 
-        # Summarise the data provided by the last json file in the archive
-        show_perf_summary(perf_data)
+        # Summarise the data provided
+        show_perf_summary(perf_data, len(json_file_list))
 
 
     else:
