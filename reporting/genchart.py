@@ -96,8 +96,7 @@ def plot_iops_vs_latency(perf_metrics):
     # Produce the chart and text output of the data
 
     xloc = np.arange(1, len(perf_metrics['read_iops']) + 1, 1)
-    xlabels = ["{} VM's".format(x) for x in xloc if x > 1]
-    xlabels.insert(0, '1 VM')
+    xlabels = [str(x) for x in xloc]
 
     # Print the data used in the chart to stdout
     micro = u'\u03bc'
@@ -115,8 +114,9 @@ def plot_iops_vs_latency(perf_metrics):
 
     # bar width
     width = 0.4
+    # fig size is in inches, actual size depends on dpi (default is 80dpi)
+    fig, ax1 = plt.subplots(figsize=(12, 8))
 
-    fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
 
     ax1.bar(xloc, perf_metrics.get('read_iops'), width, color='#d62728',
@@ -135,13 +135,16 @@ def plot_iops_vs_latency(perf_metrics):
 
     ax1.set_ylabel("IOPS")
     ax2.set_ylabel("95%ile Latency (ms)")
+    ax1.set_xlabel("Concurrent VM's")
 
     # the latency is in microseconds, so convert the display to ms for
     # readability
     ax2.yaxis.set_major_formatter(mpl.ticker.FuncFormatter(convert_2_ms))
 
-    ax1.legend(lines + lines_2, labels + labels_2, loc='best',
-               frameon=False, prop={'size': 10})
+    # Offset the legend, to a position outside of the graph
+    ax1.legend(lines + lines_2, labels + labels_2, loc='lower center',
+               bbox_to_anchor=(0.5,-0.18), ncol=4,
+               frameon=False, prop={'size': 12})
 
     ax1.spines['top'].set_visible(False)    # turn off top border
     ax2.spines['top'].set_visible(False)
@@ -149,10 +152,27 @@ def plot_iops_vs_latency(perf_metrics):
     ax1.tick_params(direction='out')        # tick marks on the outside
     ax2.tick_params(direction='out')
 
+    # Align align the yaxis tick labels to enable sensible gridlines
+    ax2.set_yticks(np.linspace(ax2.get_yticks()[0], ax2.get_yticks()[-1],
+                   len(ax1.get_yticks())))
+    ax1.set_axisbelow(True)                 # grid line behind chart elements
+    ax1.yaxis.grid(True)                    # turn on the grid
+
+    # if the xaxis labels do start to overlap, could try rotating them with
+    # plt.setp(ax1.get_xticklabels(), rotation='vertical', fontsize=12)
+
     plt.suptitle(options.title, fontsize=14)
     if options.subtitle:
+
+        # adding a \n to the subtitle, pushes the subtitle closer to the title
+        options.subtitle += '\n'
+
         plt.title(options.subtitle, fontsize=12)
     plt.xticks(xloc, xlabels)
+
+    # move plot up, making space below the graph for the legend
+    fig.subplots_adjust(bottom=0.15)
+
     plt.savefig(options.output_file)
     plt.show()
 
