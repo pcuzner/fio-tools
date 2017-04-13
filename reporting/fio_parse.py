@@ -72,6 +72,9 @@ def get_json_data(json_file, json_path):
             response['status'] = "ERROR: invalid JSON in {}".format(json_file)
         else:
             try:
+
+                missing_keys = []
+
                 for client_data in fio_json['client_stats']:
                     host_name = client_data['hostname']
 
@@ -79,10 +82,16 @@ def get_json_data(json_file, json_path):
                         element_data = get_element_value(client_data, json_key)
 
                         if str(element_data).startswith('ERROR'):
-                            raise JSONError("ERROR: unable to find element in json file for path {}".format(json_key))
+                            missing_keys.append(json_key)
+                            print("Warning: looking for json path '{}' but can't find it, skipping".format(json_key))
+                            continue
 
                         kv = {host_name: element_data}
                         response[json_key].update(kv)
+
+                    # remove any missing keys from the candidate key list
+                    json_key_list = [key for key in json_key_list
+                                     if key not in missing_keys]
 
             except JSONError as err_text:
                 response['status'] = err_text
