@@ -12,6 +12,8 @@ import fio_parse
 __author__ = 'Paul Cuzner'
 
 
+DEFAULT_LATENCY_PCTILE = '95'
+
 # Assumption - the data files we're parsing represent repeated fio runs
 # where each run includes another vm's results ie. run1 = 1 job, run 2 = 2
 # jobs, etc
@@ -54,34 +56,51 @@ def show_perf_summary(perf_metrics, num_files):
     :return:
     """
 
-    read_iops = perf_metrics.get('last_read_iops', [0])
-    write_iops = perf_metrics.get('last_write_iops', [0])
-    num_reporters = len(read_iops)
+    mixed = True if perf_metrics.get('mixed_iops') else False
 
-    all_latency = []
-    if sum(perf_metrics.get('last_read_us')) > 0:
-        all_latency += perf_metrics.get('last_read_us')
-    if sum(perf_metrics.get('last_write_us')) > 0:
-        all_latency += perf_metrics.get('last_write_us')
-
-    total_iops = (perf_metrics.get('read_iops')[-1] +
-                  perf_metrics.get('write_iops')[-1])
+    if mixed:
+        num_reporters = len(perf_metrics.get('last_mixed_iops'))
+    else:
+        num_reporters = len(perf_metrics.get('last_read_iops'))
 
     print("\nSummary Statistics")
     print("\tNumber of job files: {}".format(num_files))
     print("\tNumber of Clients  : {}".format(num_reporters))
-    print("\tTotal IOPS         : {}".format(total_iops))
-    print("\tAVG reads/VM       : {} (std={:3.1f})".format(
-        np.mean(read_iops), np.std(perf_metrics['last_read_iops'])))
-    print("\tAVG writes/VM      : {} (std={:3.1f})".format(
-        np.mean(write_iops), np.std(perf_metrics['last_write_iops'])))
 
-    print("\tAVG. Read Latency  : {}ms".format(
-        convert_2_ms(np.mean(perf_metrics.get('last_read_us')))))
-    print("\tAVG. Write Latency : {}ms".format(
-        convert_2_ms(np.mean(perf_metrics.get('last_write_us')))))
-    print("\tAVG. Latency       : {}ms".format(
-        convert_2_ms(np.mean(all_latency))))
+    if mixed:
+
+        print("\tTotal IOPS         : {}".format(perf_metrics.get('mixed_iops')[-1]))
+        print("\tAVG IOPS/VM        : {} (std={:3.1f})".format(
+              int(np.mean(perf_metrics.get('last_mixed_iops'))),
+              np.std(perf_metrics['last_mixed_iops'])))
+        print("\tAVG Latency        : {}ms".format(
+              convert_2_ms(np.mean(perf_metrics.get('last_mixed_us')))))
+
+    else:
+        total_iops = (perf_metrics.get('read_iops')[-1] +
+                      perf_metrics.get('write_iops')[-1])
+        read_iops = perf_metrics.get('last_read_iops', [0])
+        write_iops = perf_metrics.get('last_write_iops', [0])
+
+        print("\tTotal IOPS         : {} (last iteration)".format(total_iops))
+
+        all_latency = []
+        if sum(perf_metrics.get('last_read_us')) > 0:
+            all_latency += perf_metrics.get('last_read_us')
+        if sum(perf_metrics.get('last_write_us')) > 0:
+            all_latency += perf_metrics.get('last_write_us')
+
+        # specific r/w metrics
+        print("\tAVG reads/VM       : {} (std={:3.1f})".format(
+            int(np.mean(read_iops)), np.std(perf_metrics['last_read_iops'])))
+        print("\tAVG writes/VM      : {} (std={:3.1f})".format(
+            int(np.mean(write_iops)), np.std(perf_metrics['last_write_iops'])))
+        print("\tAVG. Read Latency  : {}ms".format(
+            convert_2_ms(np.mean(perf_metrics.get('last_read_us')))))
+        print("\tAVG. Write Latency : {}ms".format(
+            convert_2_ms(np.mean(perf_metrics.get('last_write_us')))))
+        print("\tAVG. Latency       : {}ms".format(
+            convert_2_ms(np.mean(all_latency))))
 
     print("\nNB.")
     print("- Summary statistics are calculated from the data points in the "
@@ -134,7 +153,7 @@ def plot_iops_vs_latency(perf_metrics):
     lines_2, labels_2 = ax2.get_legend_handles_labels()
 
     ax1.set_ylabel("IOPS")
-    ax2.set_ylabel("95%ile Latency (ms)")
+    ax2.set_ylabel("{}%ile Latency (ms)".format(options.percentile))
     ax1.set_xlabel("Concurrent VM's")
 
     # the latency is in microseconds, so convert the display to ms for
@@ -183,6 +202,10 @@ def main(options):
     perf_data = {'read_iops': [],
                  'last_read_iops': [],
                  'write_iops': [],
+                 'mixed_iops': [],
+                 'last_mixed_iops': [],
+                 'mixed_latency': [],
+                 'last_mixed_us':[],
                  'last_write_iops': [],
                  'read_latency': [],
                  'last_read_us': [],
@@ -195,6 +218,8 @@ def main(options):
     mpl.rcParams['figure.facecolor'] = 'white'   # interactive chart
     mpl.rcParams['savefig.facecolor'] = 'white'  # saved chart colour
 
+    pctile = "{:2.6f}".format(options.percentile)
+
     if json_file_list:
 
         last_file = json_file_list[-1]
@@ -203,42 +228,67 @@ def main(options):
 
             #
             # Extract the relevant metrics from the json data files
-            all = fio_parse.get_json_data(json_file=f,
-                                          json_path=['read/iops',
-                                                     'read/clat/percentile/95.000000',
-                                                     'write/iops',
-                                                     'write/clat/percentile/95.000000'])
+            all = fio_parse.get_json_data(
+                            json_file=f,
+                            json_path=['read/iops',
+                                       'read/clat/percentile/'+pctile,
+                                       'write/iops',
+                                       'write/clat/percentile/'+pctile,
+                                       'mixed/iops',
+                                       'mixed/clat/percentile/'+pctile])
 
             if all.get('status', None) == 'OK':
 
-                perf_data['read_iops'].append(
-                    sum([int(all['read/iops'].get(vm))
-                        for vm in all['read/iops']]))
-                perf_data['write_iops'].append(
-                    sum([int(all['write/iops'].get(vm))
-                        for vm in all['write/iops']]))
-                perf_data['read_latency'].append(
-                    int(np.mean([all['read/clat/percentile/95.000000'].get(vm)
-                        for vm in all['read/clat/percentile/95.000000']])))
-                perf_data['write_latency'].append(
-                    int(np.mean([all['write/clat/percentile/95.000000'].get(vm)
-                        for vm in all['write/clat/percentile/95.000000']])))
+                # if the read/iops attribute is set this run has individual
+                # read and write metrics
+
+                if all.get('read/iops'):
+                    perf_data['read_iops'].append(
+                        sum([int(all['read/iops'].get(vm))
+                            for vm in all['read/iops']]))
+                    perf_data['write_iops'].append(
+                        sum([int(all['write/iops'].get(vm))
+                            for vm in all['write/iops']]))
+                    perf_data['read_latency'].append(
+                        int(np.mean([all['read/clat/percentile/'+pctile].get(vm)
+                            for vm in all['read/clat/percentile/'+pctile]])))
+                    perf_data['write_latency'].append(
+                        int(np.mean([all['write/clat/percentile/'+pctile].get(vm)
+                            for vm in all['write/clat/percentile/'+pctile]])))
+                else:
+                    # it's not specific read/write metrics ... must be 'mixed'
+                    perf_data['mixed_iops'].append(
+                        sum([int(all['mixed/iops'].get(vm))
+                             for vm in all['mixed/iops']]))
+                    perf_data['mixed_latency'].append(
+                        sum([int(all['mixed/clat/percentile/'+pctile].get(vm))
+                             for vm in all['mixed/clat/percentile/'+pctile]]))
+
 
                 if f == last_file:
                     # we'll produce a final summary specifically from the last
                     # json file's data (should be the json file from fio run
-                    # with the most reporters (vm's)
-                    perf_data['last_read_iops'] = [int(
-                        all['read/iops'].get(vm)) for vm in all['read/iops']]
-                    perf_data['last_write_iops'] = [int(
-                        all['write/iops'].get(vm)) for vm in all['write/iops']]
-                    perf_data['last_read_us'] = [int(
-                        all['read/clat/percentile/95.000000'].get(vm))
-                                                 for vm in all['read/clat/percentile/95.000000']]
-                    perf_data['last_write_us'] = [int(
-                        all['write/clat/percentile/95.000000'].get(vm))
-                                                 for vm in all['write/clat/percentile/95.000000']]
-                    pass
+                    # with the most reporters (i.e. vm's)
+
+                    if all.get('read/iops'):
+                        perf_data['last_read_iops'] = [int(
+                            all['read/iops'].get(vm))
+                                for vm in all['read/iops']]
+                        perf_data['last_write_iops'] = [int(
+                            all['write/iops'].get(vm))
+                                for vm in all['write/iops']]
+                        perf_data['last_read_us'] = [int(
+                            all['read/clat/percentile/'+pctile].get(vm))
+                                for vm in all['read/clat/percentile/'+pctile]]
+                        perf_data['last_write_us'] = [int(
+                            all['write/clat/percentile/'+pctile].get(vm))
+                                for vm in all['write/clat/percentile/'+pctile]]
+                    else:
+                        perf_data['last_mixed_iops'] = [int(
+                            all['mixed/iops'].get(vm)) for vm in all['mixed/iops']]
+                        perf_data['last_mixed_us'] = [int(
+                            all['mixed/clat/percentile/'+pctile].get(vm))
+                                for vm in all['mixed/clat/percentile/'+pctile]]
 
             else:
                 # problem reading the data from the json file(s)
@@ -267,11 +317,18 @@ if __name__ == "__main__":
     parser.add_option("-D", "--debug", dest="debug", action="store_true",
                       default=False,
                       help="turn on debug output")
+
     parser.add_option("-p", "--pathname", dest="fio_file_path", action="store",
                       help="file name/path containing fio json output")
 
+    parser.add_option("--percentile", dest="percentile", action="store",
+                      help="latency percentile of interest",
+                      choices=['70', '80', '90', '95'],
+                      default=DEFAULT_LATENCY_PCTILE)
+
     parser.add_option("-t", "--title", dest="title", action="store",
                       help="Chart title", default="FIO Chart")
+
     parser.add_option("-s", "--subtitle", dest="subtitle", action="store",
                       help="Chart subtitle", default=None)
 
@@ -279,6 +336,8 @@ if __name__ == "__main__":
                       help="output filename", default="myfile.png")
 
     (options, args) = parser.parse_args()
+
+    options.percentile = int(options.percentile)
 
     if options.fio_file_path:
         main(options)
