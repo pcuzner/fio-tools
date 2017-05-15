@@ -83,7 +83,7 @@ def get_json_data(json_file, json_path):
 
                         if str(element_data).startswith('ERROR'):
                             missing_keys.append(json_key)
-                            print("Warning: looking for json path '{}' but can't find it, skipping".format(json_key))
+                            print("Info - looking for json path '{}' but can't find it, skipping".format(json_key))
                             continue
 
                         kv = {host_name: element_data}
